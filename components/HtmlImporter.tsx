@@ -221,6 +221,7 @@ export default function HtmlImporter({ onImportComplete, onJsonImport, }: HtmlIm
               {isProcessing ? 'Reading...' : 'Upload LearnOrg File'}
               </button>
                 <input
+                  ref={htmlInputRef}
                   type="file"
                   accept=".html,.htm,.mhtml,.webarchive"
                   className="hidden"

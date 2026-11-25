@@ -1,4 +1,5 @@
 import { SemesterType } from '@/types/Semester';
+import { gradeToPoint } from '@/constants/grades';
 
 export interface GpaBackupV1 {
   version: '1.0';
@@ -31,27 +32,89 @@ setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 export function validateJsonBackup(rawText: string): GpaBackupV1 {
-  const data = JSON.parse(rawText);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    throw new Error('File is not valid JSON.');
+  }
 
-  if (!data || typeof data !== 'object' || data.version !== '1.0') {
-    throw new Error('Unsupported or missing backup version.');
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid backup format.');
+  }
+
+  const data = parsed as Record<string, unknown>;
+
+  if (data.version !== '1.0') {
+    throw new Error('Unsupported backup version.');
+  }
+
+  if (
+    data.degree !== null &&
+    data.degree !== undefined &&
+    typeof data.degree !== 'string'
+  ) {
+    throw new Error('Invalid degree metadata in backup.');
   }
 
   if (!Array.isArray(data.semesters)) {
-    throw new Error('Invalid backup format: semesters must be a list.');
+    throw new Error('Backup is missing a valid semesters list.');
   }
 
-  // Validate each semester and its modules
   for (const sem of data.semesters) {
+    if (!sem || typeof sem !== 'object') {
+      throw new Error('Backup contains an invalid semester entry.');
+    }
+
+    const s = sem as Record<string, unknown>;
     if (
-      typeof sem.id !== 'number' ||
-      typeof sem.level !== 'number' ||
-      typeof sem.semester !== 'number' ||
-      !Array.isArray(sem.modules)
+      typeof s.id !== 'number' ||
+      typeof s.level !== 'number' ||
+      typeof s.semester !== 'number' ||
+      !Array.isArray(s.modules)
     ) {
-      throw new Error('Invalid semester structure found in backup file.');
+      throw new Error('Backup semester fields are corrupted.');
+    }
+
+    for (const mod of s.modules) {
+      if (!mod || typeof mod !== 'object') {
+        throw new Error('Backup contains an invalid module entry.');
+      }
+
+      const m = mod as Record<string, unknown>;
+      const creditsStr =
+        typeof m.credits === 'string' || typeof m.credits === 'number'
+          ? String(m.credits).trim()
+          : '';
+      const creditsNum = Number(creditsStr);
+
+      if (typeof m.name !== 'string' || m.name.trim().length === 0) {
+        throw new Error('Every module must have a valid name.');
+      }
+
+      if (
+        creditsStr === '' ||
+        !Number.isFinite(creditsNum) ||
+        creditsNum < 0
+      ) {
+        throw new Error(`Invalid credits value for module "${m.name}".`);
+      }
+
+      if (
+        typeof m.grade !== 'string' ||
+        (m.grade !== '' &&
+          !Object.prototype.hasOwnProperty.call(gradeToPoint, m.grade))
+      ) {
+        throw new Error(
+          `Invalid grade "${String(m.grade)}" for module "${m.name}".`
+        );
+      }
+
+      if (m.gpa !== 'GPA' && m.gpa !== 'NGPA') {
+        throw new Error(`Invalid GPA category for module "${m.name}".`);
+      }
     }
   }
 
-  return data as GpaBackupV1;
+  return parsed as GpaBackupV1;
 }

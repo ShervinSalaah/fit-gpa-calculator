@@ -17,6 +17,14 @@ import {
   DegreeCode,
 } from "@/constants/constraint";
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [semesters, setSemesters] = useState<SemesterType[]>([]);
@@ -184,10 +192,31 @@ export default function Home() {
           if (!confirmed) return;
         }
 
-        // Persist first so a storage error never leaves UI out of sync
-        localStorage.setItem("semester", JSON.stringify(backup.semesters));
-        if (backup.degree) {
-          localStorage.setItem("degree", backup.degree);
+       const prevSemester = localStorage.getItem("semester");
+        const prevDegree = localStorage.getItem("degree");
+
+        try {
+          localStorage.setItem("semester", JSON.stringify(backup.semesters));
+          if (backup.degree) {
+            localStorage.setItem("degree", backup.degree);
+          }
+        } catch (storageErr) {
+          try {
+            if (prevSemester !== null) {
+              localStorage.setItem("semester", prevSemester);
+            } else {
+              localStorage.removeItem("semester");
+            }
+
+            if (prevDegree !== null) {
+              localStorage.setItem("degree", prevDegree);
+            } else {
+              localStorage.removeItem("degree");
+            }
+          } catch (rollbackErr) {
+            console.error("Failed to roll back localStorage:", rollbackErr);
+          }
+          throw storageErr;
         }
 
         setSemesters(backup.semesters);
@@ -254,10 +283,10 @@ export default function Home() {
                   const rowBg = idx % 2 === 0 ? "#fff" : "#fafafa";
                   html += `
                         <tr>
-                          <td style="border:1px solid #ddd;padding:8px;background:${rowBg};color:#000;">${module.name}</td>
-                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${module.credits}</td>
-                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${module.grade}</td>
-                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${module.gpa}</td>
+                          <td style="border:1px solid #ddd;padding:8px;background:${rowBg};color:#000;">${escapeHtml(module.name)}</td>
+                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(module.credits)}</td>
+                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(module.grade)}</td>
+                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(module.gpa)}</td>
                         </tr>
                       `;
                 });
