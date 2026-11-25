@@ -6,9 +6,10 @@ import { gradeToPoint } from '@/constants/grades';
 interface HtmlImporterProps {
   onImportComplete: (gradesMap: Record<string, string>) => void;
   onJsonImport: (file: File) => void;
+  onNotify?: (message: string, type?: 'success' | 'error') => void;
 }
 
-export default function HtmlImporter({ onImportComplete, onJsonImport, }: HtmlImporterProps){
+export default function HtmlImporter({ onImportComplete, onJsonImport, onNotify, }: HtmlImporterProps){
   const [showMenu, setShowMenu] = useState(false); 
   const [showInstructions, setShowInstructions] = useState(false);
   const [deviceTab, setDeviceTab] = useState<'desktop' | 'mobile'>('desktop');
@@ -21,7 +22,11 @@ export default function HtmlImporter({ onImportComplete, onJsonImport, }: HtmlIm
     if (!file) return;
     e.target.value = '';
     if (file.size > 10 * 1024 * 1024) {
+    if (onNotify) {
+      onNotify('The selected file is too large to import.', 'error');
+    } else {
       alert('The selected file is too large to import.');
+    }
       return;
     }
     setIsProcessing(true);
@@ -52,15 +57,22 @@ export default function HtmlImporter({ onImportComplete, onJsonImport, }: HtmlIm
         setShowInstructions(false);
       } catch (error) {
         console.error('Failed to parse HTML:', error);
+        if (onNotify) {
+        onNotify('Failed to parse the file.', 'error');
+      } else {
         alert('Failed to parse the file.');
-      } finally {
+      } 
+    } finally {
         setIsProcessing(false);
       }
     };
     reader.onerror = () => {
       console.error('Failed to read file:', reader.error);
+      if (onNotify) {
+      onNotify('Failed to read the file.', 'error');
+    } else {
       alert('Failed to read the file.');
-      setIsProcessing(false);
+    }setIsProcessing(false);
     };
 
     reader.readAsText(file);

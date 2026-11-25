@@ -15,12 +15,14 @@ const DownloadPDF = ({
   summary,
   tableHtml,
   onExportJson,
+  onExportPdfSuccess,
 }: {
   totalCredits: number;
   result: string;
   summary: string;
   tableHtml: string;
   onExportJson: () => void;
+  onExportPdfSuccess?: () => void;
 }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -67,7 +69,7 @@ const DownloadPDF = ({
       </div>
     `;
 
-    html2pdf()
+    await html2pdf()
       .set({
         margin: [35, 25, 60, 25], // add padding, esp. bottom
         filename: "gpa-summary.pdf",
@@ -76,6 +78,7 @@ const DownloadPDF = ({
       })
       .from(element)
       .save();
+    onExportPdfSuccess?.();
   };
 
   return (

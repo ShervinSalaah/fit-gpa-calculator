@@ -82,23 +82,27 @@ export function validateJsonBackup(rawText: string): GpaBackupV1 {
       }
 
       const m = mod as Record<string, unknown>;
-      const creditsStr =
-        typeof m.credits === 'string' || typeof m.credits === 'number'
-          ? String(m.credits).trim()
-          : '';
-      const creditsNum = Number(creditsStr);
 
-      if (typeof m.name !== 'string' || m.name.trim().length === 0) {
+      if (typeof m.name !== 'string') {
         throw new Error('Every module must have a valid name.');
       }
 
+      if (typeof m.credits !== 'string' && typeof m.credits !== 'number') {
+        throw new Error(`Invalid credits value for module "${m.name}".`);
+      }
+
+      const creditsStr = String(m.credits).trim();
+      const creditsNum = Number(creditsStr);
+
       if (
-        creditsStr === '' ||
-        !Number.isFinite(creditsNum) ||
-        creditsNum < 0
+        creditsStr !== '' &&
+        (!Number.isFinite(creditsNum) || creditsNum < 0)
       ) {
         throw new Error(`Invalid credits value for module "${m.name}".`);
       }
+
+      // Normalize numeric credits (e.g. 3 -> "3") to match ModuleType
+      m.credits = creditsStr;
 
       if (
         typeof m.grade !== 'string' ||

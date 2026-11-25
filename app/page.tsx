@@ -9,6 +9,8 @@ import DownloadPDF from "../components/DownloadPDF";
 import { gradeToPoint } from "@/constants/grades";
 import { SemesterType, ModuleType } from "@/types/Semester";
 import HtmlImporter from "../components/HtmlImporter";
+import ConfirmDialog from "../components/ConfirmDialog";
+import Toast, { ToastState } from "../components/Toast";
 import { downloadJsonBackup, validateJsonBackup } from "@/utils/backup";
 import {
   degreeMap,
@@ -19,15 +21,22 @@ import {
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [semesters, setSemesters] = useState<SemesterType[]>([]);
+  type BackupData = ReturnType<typeof validateJsonBackup>;
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [pendingBackup, setPendingBackup] = useState<BackupData | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+  };
 
   useEffect(() => {
     const storedSemesters = localStorage.getItem("semester");
@@ -96,7 +105,6 @@ export default function Home() {
       const storedDegree = localStorage.getItem("degree");
       let template: SemesterType[] = [];
 
-      // Fetch the full 8-semester template based on the user's selected degree
       if (storedDegree) {
         if ((storedDegree as Degree) in degreeMap) {
           template = degreeMap[storedDegree as Degree];
@@ -106,17 +114,18 @@ export default function Home() {
       }
 
       if (template.length === 0) {
-        alert("Please select a degree template first from the main menu.");
+        showToast(
+          "Please select a degree template first from the main menu.",
+          "error",
+        );
         return;
       }
 
-      // Merge the existing semesters with the template to ensure we don't lose manually added custom modules
       const updatedSemesters = [...semesters];
 
       template.forEach((templateSem) => {
         let hasImportedGrades = false;
 
-        // Deep copy the template modules so we don't mutate the constant
         const semModules = templateSem.modules.map((mod: ModuleType) => {
           const modNameLower = mod.name.trim().toLowerCase();
           if (gradesMap[modNameLower]) {
@@ -126,13 +135,11 @@ export default function Home() {
           return { ...mod };
         });
 
-        // Check if this semester already exists in the user's current view
         const existingSemIndex = updatedSemesters.findIndex(
           (s) => s.id === templateSem.id,
         );
 
         if (existingSemIndex !== -1) {
-          // Update the existing semester's grades
           const existingModules = updatedSemesters[existingSemIndex].modules;
           semModules.forEach((newMod: ModuleType) => {
             const matchIndex = existingModules.findIndex(
@@ -144,37 +151,68 @@ export default function Home() {
               existingModules[matchIndex].grade =
                 newMod.grade || existingModules[matchIndex].grade;
             } else if (newMod.grade) {
-              // If it's in the template, has a grade, but was deleted by the user, add it back
               existingModules.push(newMod);
             }
           });
           updatedSemesters[existingSemIndex].modules = [...existingModules];
         } else if (hasImportedGrades) {
-          // If the semester is not currently shown but has imported grades, add it to the view
           updatedSemesters.push({
             id: templateSem.id,
             level: templateSem.level,
             semester: templateSem.semester,
-            modules: semModules.filter((mod) => mod.grade !== ''),
+            modules: semModules.filter((mod) => mod.grade !== ""),
           });
         }
       });
 
-      // Sort by ID to keep Semester 1, 2, 3 in order
       updatedSemesters.sort((a, b) => a.id - b.id);
       setSemesters(updatedSemesters);
-      alert("Results imported successfully!");
+      showToast("LearnOrg results imported successfully!", "success");
     } catch (err) {
       console.error(err);
-      alert("An error occurred while matching the modules.");
+      showToast("An error occurred while matching the modules.", "error");
     }
   };
+
   const handleJsonExport = () => {
     if (semesters.length === 0) {
-      alert("No GPA data to export yet.");
+      showToast("No GPA data to export yet.", "error");
       return;
     }
     downloadJsonBackup(semesters);
+    showToast("JSON backup exported successfully!", "success");
+  };
+
+  const applyJsonBackup = (backup: BackupData) => {
+    const prevSemester = localStorage.getItem("semester");
+    const prevDegree = localStorage.getItem("degree");
+
+    try {
+      localStorage.setItem("semester", JSON.stringify(backup.semesters));
+      if (backup.degree) {
+        localStorage.setItem("degree", backup.degree);
+      }
+    } catch (storageErr) {
+      try {
+        if (prevSemester !== null) {
+          localStorage.setItem("semester", prevSemester);
+        } else {
+          localStorage.removeItem("semester");
+        }
+
+        if (prevDegree !== null) {
+          localStorage.setItem("degree", prevDegree);
+        } else {
+          localStorage.removeItem("degree");
+        }
+      } catch (rollbackErr) {
+        console.error("Failed to roll back localStorage:", rollbackErr);
+      }
+      throw storageErr;
+    }
+
+    setSemesters(backup.semesters);
+    showToast("GPA backup restored successfully!", "success");
   };
 
   const handleJsonImport = (file: File) => {
@@ -184,56 +222,43 @@ export default function Home() {
         const text = event.target?.result as string;
         const backup = validateJsonBackup(text);
 
-        // Require confirmation before overwriting existing data
         if (semesters.length > 0) {
-          const confirmed = window.confirm(
-            "Importing this backup will replace your current GPA records. Continue?",
-          );
-          if (!confirmed) return;
+          setPendingBackup(backup);
+          return;
         }
 
-       const prevSemester = localStorage.getItem("semester");
-        const prevDegree = localStorage.getItem("degree");
-
-        try {
-          localStorage.setItem("semester", JSON.stringify(backup.semesters));
-          if (backup.degree) {
-            localStorage.setItem("degree", backup.degree);
-          }
-        } catch (storageErr) {
-          try {
-            if (prevSemester !== null) {
-              localStorage.setItem("semester", prevSemester);
-            } else {
-              localStorage.removeItem("semester");
-            }
-
-            if (prevDegree !== null) {
-              localStorage.setItem("degree", prevDegree);
-            } else {
-              localStorage.removeItem("degree");
-            }
-          } catch (rollbackErr) {
-            console.error("Failed to roll back localStorage:", rollbackErr);
-          }
-          throw storageErr;
-        }
-
-        setSemesters(backup.semesters);
-        alert("GPA backup restored successfully!");
+        applyJsonBackup(backup);
       } catch (err) {
         console.error("JSON import failed:", err);
-        alert(
+        showToast(
           err instanceof Error
             ? `Import failed: ${err.message}`
             : "Invalid JSON backup file. Your existing data was not changed.",
+          "error",
         );
       }
     };
     reader.onerror = () => {
-      alert("Failed to read the backup file.");
+      showToast("Failed to read the backup file.", "error");
     };
     reader.readAsText(file);
+  };
+
+  const handleConfirmJsonRestore = () => {
+    if (!pendingBackup) return;
+    try {
+      applyJsonBackup(pendingBackup);
+    } catch (err) {
+      console.error("JSON restore failed:", err);
+      showToast(
+        err instanceof Error
+          ? `Import failed: ${err.message}`
+          : "Failed to restore backup. Your existing data was not changed.",
+        "error",
+      );
+    } finally {
+      setPendingBackup(null);
+    }
   };
   return (
     <>
@@ -243,9 +268,13 @@ export default function Home() {
         <HtmlImporter
           onImportComplete={handleHtmlImport}
           onJsonImport={handleJsonImport}
+          onNotify={showToast}
         />
         <DownloadPDF
           onExportJson={handleJsonExport}
+          onExportPdfSuccess={() =>
+            showToast("PDF report exported successfully!", "success")
+          }
           totalCredits={totalGPACredits + totalNGPACredits}
           result={`Overall GPA: ${overallGPA}`}
           summary={`GPA Credits: ${totalGPACredits}, NGPA Credits: ${totalNGPACredits}`}
@@ -284,7 +313,7 @@ export default function Home() {
                   html += `
                         <tr>
                           <td style="border:1px solid #ddd;padding:8px;background:${rowBg};color:#000;">${escapeHtml(module.name)}</td>
-                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(module.credits)}</td>
+                          <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(String(module.credits))}</td>
                           <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(module.grade)}</td>
                           <td style="border:1px solid #ddd;padding:8px;text-align:center;background:${rowBg};color:#000;">${escapeHtml(module.gpa)}</td>
                         </tr>
@@ -333,6 +362,16 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={pendingBackup !== null}
+        title="Replace Existing Data?"
+        message="Importing this backup will replace your current GPA records. Continue?"
+        confirmText="Replace & Restore"
+        cancelText="Cancel"
+        onConfirm={handleConfirmJsonRestore}
+        onCancel={() => setPendingBackup(null)}
+      />
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </>
   );
 }
