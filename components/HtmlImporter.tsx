@@ -14,6 +14,7 @@ export default function HtmlImporter({ onImportComplete, onJsonImport, }: HtmlIm
   const [deviceTab, setDeviceTab] = useState<'desktop' | 'mobile'>('desktop');
   const [isProcessing, setIsProcessing] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+  const htmlInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,15 +212,21 @@ export default function HtmlImporter({ onImportComplete, onJsonImport, }: HtmlIm
 
             {/* Modal Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 w-full">
-              <label className="flex-1 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-lg font-semibold text-center cursor-pointer transition-all duration-200 shadow-md active:scale-95">
-                {isProcessing ? 'Reading...' : 'Upload LearnOrg File'}
+            <button
+                type="button"
+                onClick={() => htmlInputRef.current?.click()}
+                disabled={isProcessing}
+                className="flex-1 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-lg font-semibold text-center cursor-pointer transition-all duration-200 shadow-md active:scale-95 disabled:opacity-60"
+              >       
+              {isProcessing ? 'Reading...' : 'Upload LearnOrg File'}
+              </button>
                 <input
                   type="file"
                   accept=".html,.htm,.mhtml,.webarchive"
                   className="hidden"
                   onChange={handleFileUpload}
                 />
-              </label>
+              
               <button
                 onClick={() => setShowInstructions(false)}
                 className="flex-1 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 font-semibold transition-all duration-200 shadow-md active:scale-95"

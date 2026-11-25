@@ -147,7 +147,7 @@ export default function Home() {
             id: templateSem.id,
             level: templateSem.level,
             semester: templateSem.semester,
-            modules: semModules,
+            modules: semModules.filter((mod) => mod.grade !== ''),
           });
         }
       });
