@@ -14,13 +14,16 @@ const DownloadPDF = ({
   result,
   summary,
   tableHtml,
+  onExportJson,
 }: {
   totalCredits: number;
   result: string;
   summary: string;
   tableHtml: string;
+  onExportJson: () => void;
 }) => {
   const [showPopup, setShowPopup] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [degree, setDegree] = useState<Degree | "">("");
   const [university, setUniversity] = useState<University>(
     "University of Moratuwa",
@@ -76,9 +79,9 @@ const DownloadPDF = ({
   };
 
   return (
-    <div className="w-full flex justify-center md:justify-end mb-5 px-4 sm:px-0">
+    <div className="relative w-full sm:w-auto">
       <button
-        onClick={handleDownload}
+        onClick={() => setShowMenu((prev) => !prev)}
         className="w-full sm:w-auto min-w-0 px-3 sm:px-4 py-2.5 sm:py-2 bg-fuchsia-600 dark:bg-fuchsia-600 hover:bg-fuchsia-700 dark:hover:bg-fuchsia-700 text-white rounded-md font-semibold flex gap-2 items-center justify-center transition-all duration-200 active:scale-95 touch-manipulation"
       >
         <Image
@@ -86,17 +89,45 @@ const DownloadPDF = ({
           width={20}
           height={20}
           className="sm:w-6 sm:h-6 flex-shrink-0"
-          alt="download"
+          alt="export"
         />
         <span className="text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
-          Export GPA Summary
+          Export
         </span>
       </button>
+      {showMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-30"
+            onClick={() => setShowMenu(false)}
+          />
+<div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 z-40 overflow-hidden">          <button
+            onClick={() => {
+              setShowMenu(false);
+              handleDownload();
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200 hover:bg-fuchsia-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            Export PDF Report
+          </button>
+          <button
+            onClick={() => {
+              setShowMenu(false);
+              onExportJson();
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-800 dark:text-gray-200 hover:bg-fuchsia-50 dark:hover:bg-slate-700 transition-colors border-t border-gray-100 dark:border-slate-700"
+          >
+            Export JSON Backup
+          </button>
+        </div>
+        </>
+      )}
+
       {showPopup && (
         <div className="fixed inset-0 flex items-center justify-center z-50 px-6 bg-black bg-opacity-80 backdrop-blur-sm">
           <div className="bg-gradient-to-r from-blue-100 via-purple-100 to-cyan-50 dark:bg-gradient-to-r dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-8 rounded-2xl shadow-2xl max-w-md w-full flex flex-col justify-center items-center relative transition-colors duration-300">
             <h2 className="text-2xl font-extrabold mb-6 text-fuchsia-600 dark:text-fuchsia-400 text-center">
-              Export GPA Summary
+              Export 
             </h2>
 
             {/* University */}
