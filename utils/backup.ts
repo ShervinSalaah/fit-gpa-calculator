@@ -102,7 +102,7 @@ export function validateJsonBackup(rawText: string): GpaBackupV1 {
       }
 
       // Normalize numeric credits (e.g. 3 -> "3") to match ModuleType
-      m.credits = creditsStr;
+      m.credits = creditsStr === '' ? '' : String(creditsNum);;
 
       if (
         typeof m.grade !== 'string' ||

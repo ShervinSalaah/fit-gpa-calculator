@@ -30,6 +30,10 @@ const escapeHtml = (value: string) =>
 export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [semesters, setSemesters] = useState<SemesterType[]>([]);
+  const semestersRef = useRef<SemesterType[]>(semesters);
+  useEffect(() => {
+    semestersRef.current = semesters;
+  }, [semesters]);
   type BackupData = ReturnType<typeof validateJsonBackup>;
   const [toast, setToast] = useState<ToastState | null>(null);
   const [pendingBackup, setPendingBackup] = useState<BackupData | null>(null);
@@ -191,6 +195,8 @@ export default function Home() {
       localStorage.setItem("semester", JSON.stringify(backup.semesters));
       if (backup.degree) {
         localStorage.setItem("degree", backup.degree);
+      } else if (backup.degree === null) {
+        localStorage.removeItem("degree");
       }
     } catch (storageErr) {
       try {
@@ -222,7 +228,7 @@ export default function Home() {
         const text = event.target?.result as string;
         const backup = validateJsonBackup(text);
 
-        if (semesters.length > 0) {
+        if (semestersRef.current.length > 0) {
           setPendingBackup(backup);
           return;
         }
